@@ -1,6 +1,7 @@
-# libShunkan
+# libShunkan [瞬間](https://ja.wikipedia.org/wiki/%E7%9E%AC%E9%96%93)
 
 Lightweight game engine for Linux, aimed to have lowest possible latency and memory footprint.
+Name comes from [japanese word](https://translate.google.com/translate?hl=en&sl=ja&tl=en&u=https%3A%2F%2Fja.wikipedia.org%2Fwiki%2F%E7%9E%AC%E9%96%93), meaning "moment", or "instant", because this work is dedicaded to achieving realtime performance.
 
 ## Getting Started, Prequisites 
 
