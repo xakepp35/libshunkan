@@ -1,5 +1,5 @@
 /*
-	Game loop backend
+	Event loop backend (epoll/kqueue/iocp)
 	Date: 2018.08.30
 	Author: xakepp35
 	License: FreeBSD 3-clause
@@ -9,94 +9,60 @@
 // C++
 #include <cstdint> 
 #include <vector>
-#include <atomic>
+
 
 namespace logic {
-	
-	typedef uint64_t stamp_t;
 
-	// game loop backend
-	class loop {
-		
-		public:
-		
-			loop(uint64_t fixedFPS, void* userDataInitial);
-			~loop();
-			
-			// runs the loop
-			void main();
-			
-			// returns current frame number
-			stamp_t frame_number() const;
-			
-			// for most input events it would be "in the future", for timer event (on_frame_finish) it would be "in the past"
-			uint64_t frame_stamp() const;
-			
-			virtual void on_frame_finish() = 0;
-		
+	class loop;
+
+	// really libinput mimics: see libinput-private.h  huh.. shouldn't i just reue libinput code? Okay, lest stay really sharp and mad :)
+	typedef void (loop::*event_source_dispatch_t)(loop& thisLoop, int fD);
+
+
+	class event_source
+	{
+	public:
+
+		event_source(event_source_dispatch_t dispatchDelegate, int fD = -1);
+		~event_source();
+
+		int read_buf(void* dataBuf, size_t dataSize);
+		int get_fd() const;
+
+	public:
+
+		event_source_dispatch_t _dispatchDelegate;
+		int _fD; // emitter file descriptor for event
+
+	};
+
+
+	class loop:
+		public event_source // epoll descriptor, couldn't it be registred in different epoll? :-)
+	{
+	public:
+
+		loop();
+		~loop();
+
+		// runs the loop
+		void main();
+
+		event_source& add_fd(int fd, event_source_dispatch_t dispatch);
+		bool add_fd(const event_source& externalSource);
+
 		// impl
-		protected:
-		
-			void poll_events();
-			
-			void frame_finish_wrapper(int fd);
-			
-			void advance_frame();
-			
-			// frame_data manipulations: maintains sync to render thread
-			void frame_start_atomic(stamp_t targetStamp);
-			void frame_end_atomic(stamp_t actualStamp);
-			
-			// rearms timerfd
-			void rearm_timer(stamp_t targetStamp);
+	protected:
 
-			void rearm_timer(stamp_t targetStamp);	
-			
-			// write state to pass to render thread
-			void write_frame_atomic(); 
-			
-		// epoll fd control
-		protected:
+		void poll_events();
 		
-			// libinput mimics: libinput-private.h
-			void (loop::*event_source_dispatch_t)(int fd);
-			
-			struct event_source {
-				//loop *thisLoop; // this
-				event_source_dispatch_t _dispatch;
-				int _fd; // emitter file descriptor for event
-				
-				event_source(event_source_dispatch_t dispatch = NULL, int fd = -1);
-				~event_source();
-			};
-			
-			event_source& add_fd(int fd, event_source_dispatch_t dispatch);
-			
-		// data
-		protected:
-		
-			uint64_t _frameNumber;
-			uint64_t _fixedFPS;
-			
-			int _epollFD; // epoll descriptor
-			int _timerFD; // timer descriptor
-			
-			
-			struct frame_data {
-				void*		_userData;
-				uint64_t	_frameNumber;
-				stamp_t		_targetStamp;
-				stamp_t		_actualStamp; // jitter could be calculated
-			};
-			
-			
-			
-			std::atomic< frame_data* > _frameDataExchange; // used for lockless producer-consumer interthread sync(aka triple-buffering)
-			frame_data* _frameDataCurrent; // populate this stuff in ctor()!
-			
-			std::vector<event_source> _eventSources;
-			bool _loopActive;
+	// data
+	protected:
+
+		std::vector<event_source> _eventSources;
+		bool _loopActive;
 		
 	};
+
 	
 }
